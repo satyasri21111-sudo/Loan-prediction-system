@@ -7,6 +7,7 @@ Endpoints:
 - GET  /api/analysis   : Aggregated statistics for EDA visualizations
 - GET  /api/model      : ML model evaluation metrics (LR, DT, RF)
 - POST /api/predict    : Run prediction for a new loan applicant
+- GET  /               : Serves the React frontend SPA
 """
 
 import os
@@ -20,7 +21,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 from src.data_cleaning import detect_missing_values, check_duplicates, clean_loan_dataset
@@ -29,7 +30,14 @@ from src.model_training import train_all_models
 from src.evaluation import evaluate_models
 from src.prediction import predict_loan_application
 
-app = Flask(__name__)
+# Static folder pointing to compiled React frontend (dist/) in root directory
+DIST_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "dist"))
+
+app = Flask(
+    __name__,
+    static_folder=DIST_DIR if os.path.exists(DIST_DIR) else None,
+    static_url_path="/"
+)
 CORS(app)  # Enable Cross-Origin Resource Sharing for React frontend
 
 # Global cached variables for fast responses
@@ -52,8 +60,7 @@ def load_and_initialize():
     raw_df = pd.read_csv(DATA_PATH)
     cleaned_df, _ = clean_loan_dataset(raw_df, fill_strategy="standard")
 
-    # Preprocess & split
-    # preprocess_data returns 9 values; we only need the first 6 here
+    # Claude's unpack fix: unpack first 6 returned values and ignore the remaining 3
     X_train, X_test, y_train, y_test, scaler, feature_names, *_ = preprocess_data(
         cleaned_df, test_size=0.2, random_state=42
     )
@@ -235,7 +242,6 @@ def predict():
     selected_model = trained_models.get(model_choice) if trained_models else None
 
     if selected_model is None:
-        # Fallback to first available model
         if trained_models:
             selected_model = next(iter(trained_models.values()))
         else:
@@ -260,6 +266,25 @@ def predict():
     })
 
 
+# ==============================================================================
+# SERVE PRODUCTION REACT FRONTEND
+# ==============================================================================
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve(path):
+    """Serve production React build (SPA routing) when dist folder exists."""
+    dist_folder = os.path.abspath(os.path.join(BASE_DIR, "..", "dist"))
+    if path != "" and os.path.exists(os.path.join(dist_folder, path)):
+        return send_from_directory(dist_folder, path)
+    if os.path.exists(os.path.join(dist_folder, "index.html")):
+        return send_from_directory(dist_folder, "index.html")
+    return jsonify({
+        "status": "Backend running. Build frontend into dist/ to view UI."
+    })
+
+
 if __name__ == "__main__":
-    print("Starting Flask server on http://localhost:5000 ...")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Starting Flask server on http://localhost:{port} ...")
+    app.run(host="0.0.0.0", port=port, debug=True)
