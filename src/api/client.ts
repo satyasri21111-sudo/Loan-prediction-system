@@ -1,12 +1,17 @@
 /**
  * API Client for Loan Prediction Data Analysis System
- * Connects frontend to Python Flask backend (default http://localhost:5000).
- * Strictly communicates with real Flask API; silent local fallbacks have been removed.
+ * Connects frontend to Python Flask backend.
+ * Uses relative paths in production (Render deployment) and localhost:5000 in local development.
  */
 
 import { ApplicantInput, ModelMetric } from '../types';
 
-const DEFAULT_BACKEND_URL = 'http://localhost:5000';
+// In production on Render, backend and frontend share the same origin.
+// In local dev, Vite runs on port 3000 while Flask runs on port 5000.
+const DEFAULT_BACKEND_URL =
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? ''
+    : 'http://localhost:5000';
 
 export interface DatasetApiResponse {
   total_records: number;
@@ -93,7 +98,7 @@ class ApiService {
     try {
       const res = await fetch(`${this.backendUrl}/api/health`, {
         method: 'GET',
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(3000),
       });
       this.isConnected = res.ok;
       return res.ok;
@@ -106,7 +111,7 @@ class ApiService {
   async getDataset(): Promise<ApiResponse<DatasetApiResponse>> {
     try {
       const res = await fetch(`${this.backendUrl}/api/dataset`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(6000),
       });
       if (res.ok) {
         const json = await res.json();
@@ -123,7 +128,7 @@ class ApiService {
       return {
         success: false,
         data: null,
-        error: 'Backend unavailable. Please start the Python server on port 5000.',
+        error: 'Backend unavailable. Please start the Python server.',
       };
     }
   }
@@ -131,7 +136,7 @@ class ApiService {
   async getAnalysis(): Promise<ApiResponse<AnalysisApiResponse>> {
     try {
       const res = await fetch(`${this.backendUrl}/api/analysis`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(6000),
       });
       if (res.ok) {
         const json = await res.json();
@@ -148,7 +153,7 @@ class ApiService {
       return {
         success: false,
         data: null,
-        error: 'Backend unavailable. Please start the Python server on port 5000.',
+        error: 'Backend unavailable. Please start the Python server.',
       };
     }
   }
@@ -156,7 +161,7 @@ class ApiService {
   async getModel(): Promise<ApiResponse<ModelApiResponse>> {
     try {
       const res = await fetch(`${this.backendUrl}/api/model`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(6000),
       });
       if (res.ok) {
         const json = await res.json();
@@ -173,7 +178,7 @@ class ApiService {
       return {
         success: false,
         data: null,
-        error: 'Backend unavailable. Please start the Python server on port 5000.',
+        error: 'Backend unavailable. Please start the Python server.',
       };
     }
   }
@@ -187,7 +192,7 @@ class ApiService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...input, model_choice: modelChoice }),
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(6000),
       });
       if (res.ok) {
         const json = await res.json();
@@ -204,7 +209,7 @@ class ApiService {
       return {
         success: false,
         data: null,
-        error: 'Backend unavailable. Please start the Python server on port 5000.',
+        error: 'Backend unavailable. Please start the Python server.',
       };
     }
   }
